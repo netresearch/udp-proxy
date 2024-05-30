@@ -1,13 +1,14 @@
 package main
 
 import (
-	"flag"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 func main() {
@@ -24,6 +25,10 @@ func main() {
 	}
 
 	log.Info().Int("port", config.Port).Msg("Listening on UDP port")
+	log.Info().Msg("Forward targets:")
+	for k, v := range config.Forwards {
+		log.Info().Msgf("  %s -> %s", k, v)
+	}
 
 	for {
 		buf := make([]byte, 1024)
@@ -43,22 +48,43 @@ type Config struct {
 }
 
 func parseOptions() (*Config, error) {
-	configPath := flag.String("config", "config.yml", "Path to the config file")
+	pflag.Int("port", 5000, "port to listen on")
+	pflag.String("forwards", "", "comma separated list of forwards")
 
-	flag.Parse()
+	pflag.Parse()
 
-	fd, err := os.Open(*configPath)
-	if err != nil {
-		return nil, err
+	viper.SetDefault("port", 5000)
+	viper.SetDefault("forwards", "")
+
+	viper.SetConfigName("udp-proxy")
+	viper.SetConfigType("yml")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("/etc/udp-proxy")
+	viper.AddConfigPath("$HOME/.config/udp-proxy")
+	viper.AddConfigPath("$HOME/.udp-proxy")
+
+	viper.SetEnvPrefix("proxy")
+	viper.BindEnv("port")
+	viper.BindEnv("forwards")
+
+	viper.BindPFlag("port", pflag.Lookup("port"))
+	viper.BindPFlag("forwards", pflag.Lookup("forwards"))
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
+		}
+
+		log.Warn().Msg("No config file found")
 	}
-	defer fd.Close()
 
-	var config Config
-	if err = yaml.NewDecoder(fd).Decode(&config); err != nil {
-		return nil, err
-	}
+	port := viper.GetInt("port")
+	forwards := viper.GetString("forwards")
 
-	return &config, nil
+	return &Config{
+		Port:     port,
+		Forwards: parseForwards(forwards),
+	}, nil
 }
 
 func forward(config *Config, addr *net.UDPAddr, buf []byte) {
@@ -93,4 +119,24 @@ func forward(config *Config, addr *net.UDPAddr, buf []byte) {
 	}
 
 	l.Info().Int("bytes", len(buf)).Msg("Forwarded")
+}
+
+func parseForwards(raw string) map[string]string {
+	forwards := make(map[string]string)
+
+	if raw == "" {
+		return forwards
+	}
+
+	rawForwards := strings.Split(raw, ",")
+	for _, rawForward := range rawForwards {
+		parts := strings.SplitN(rawForward, ":", 2)
+
+		remote := parts[0]
+		target := parts[1]
+
+		forwards[remote] = target
+	}
+
+	return forwards
 }
