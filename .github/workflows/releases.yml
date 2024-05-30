@@ -1,0 +1,48 @@
+name: Build releases
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - { goos: "linux", goarch: "amd64" }
+          - { goos: "linux", goarch: "arm" }
+          - { goos: "linux", goarch: "arm64" }
+          - { goos: "freebsd", goarch: "amd64" }
+          - { goos: "windows", goarch: "amd64" }
+      fail-fast: true
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      TARGET: udp-proxy-${{ matrix.goos }}-${{ matrix.goarch }}
+    name: Build ${{ matrix.goos }} ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.22
+
+      - name: Build
+        run: |
+          mkdir -p $TARGET
+          go build -v -o $TARGET/udp-proxy .
+          cp LICENSE README.md $TARGET
+          tar -czf $TARGET.tar.gz $TARGET
+
+      - name: Upload action artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.TARGET }}
+          path: ${{ env.TARGET }}.tar.gz
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.TARGET }}.tar.gz
