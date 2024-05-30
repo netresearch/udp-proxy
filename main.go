@@ -12,9 +12,13 @@ import (
 
 func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).Level(zerolog.TraceLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	config := parseOptions()
+	config, err := parseOptions()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to parse options")
+	}
+	zerolog.SetGlobalLevel(config.LogLevel)
 
 	listener, err := net.ListenUDP("udp", &net.UDPAddr{Port: config.Port})
 	if err != nil {
@@ -42,18 +46,26 @@ func main() {
 type Config struct {
 	Port     int
 	Forwards map[string]*net.UDPAddr
+	LogLevel zerolog.Level
 }
 
-func parseOptions() *Config {
+func parseOptions() (*Config, error) {
 	port := pflag.Int("port", 5000, "Port to listen on")
 	forwards := pflag.StringArray("forward", []string{}, "Forwards (can be specified multiple times, format: sourceIP:targetIP:targetPort)")
+	rawLogLevel := pflag.String("log-level", "info", "Log level")
 
 	pflag.Parse()
+
+	logLevel, err := zerolog.ParseLevel(*rawLogLevel)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Port:     *port,
 		Forwards: parseForwards(*forwards),
-	}
+		LogLevel: logLevel,
+	}, nil
 }
 
 func forward(config *Config, addr *net.UDPAddr, buf []byte) {
@@ -63,7 +75,7 @@ func forward(config *Config, addr *net.UDPAddr, buf []byte) {
 
 	target, ok := config.Forwards[string(addr.IP.To16())]
 	if !ok {
-		l.Warn().Msg("No forward for remote IP")
+		l.Debug().Msg("No forward for remote IP")
 		return
 	}
 	targetAddr := target.String()
@@ -82,7 +94,7 @@ func forward(config *Config, addr *net.UDPAddr, buf []byte) {
 		return
 	}
 
-	l.Info().Int("bytes", len(buf)).Msg("Forwarded")
+	l.Trace().Int("bytes", len(buf)).Msg("Forwarded")
 }
 
 func parseForwards(raw []string) map[string]*net.UDPAddr {

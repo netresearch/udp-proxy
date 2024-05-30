@@ -8,13 +8,15 @@ You can download the binary for your platform from the [releases page](https://g
 
 ## Usage
 
-With the binary:
-
 ```
 --port <port>     The port to listen on
 --forward <source-ip>:<remote-ip>:<remote-port>
                   Forward packets from <source-ip> to <remote-ip>:<remote-port>, you can specify --forward multiple times
+--log-level <level>
+                  Set the log level (trace, debug, info, warn, error, fatal, panic)
 ```
+
+With the binary:
 
 ```sh
 ./udp-proxy --port 5000 --forward <source-ip>:<remote-ip>:<remote-port>
