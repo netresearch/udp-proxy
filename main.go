@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/netresearch/udp-proxy/internal/build"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
@@ -19,6 +20,12 @@ func main() {
 		log.Fatal().Err(err).Msg("Failed to parse options")
 	}
 	zerolog.SetGlobalLevel(config.LogLevel)
+
+	log.Info().
+		Str("version", build.Version).
+		Str("commit", build.Commit).
+		Str("buildTime", build.BuildTime).
+		Msg("Starting")
 
 	listener, err := net.ListenUDP("udp", &net.UDPAddr{Port: config.Port})
 	if err != nil {
