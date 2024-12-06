@@ -12,7 +12,7 @@ RUN export COMMIT="$(git rev-parse --short HEAD)"
 RUN export BUILD_TIME=$(date '+%Y-%m-%dT%H:%M:%S')
 RUN go build -o /udp-proxy -ldflags="-s -w -X '${PACKAGE}.Version=${VERSION}' -X '${PACKAGE}.Commit=${COMMIT}' -X '${PACKAGE}.BuildTime=${BUILD_TIME}'"
 
-FROM alpine:3.20 AS runner
+FROM alpine:3.21 AS runner
 WORKDIR /data
 
 COPY --from=builder /udp-proxy /bin/udp-proxy
