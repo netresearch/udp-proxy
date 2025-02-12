@@ -1,4 +1,4 @@
-FROM golang:1.23 AS builder
+FROM golang:1.24 AS builder
 WORKDIR /build
 ENV PACKAGE="github.com/netresearch/udp-proxy/internal/build"
 ENV CGO_ENABLED=0
